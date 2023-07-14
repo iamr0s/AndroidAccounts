@@ -2,9 +2,9 @@ package com.rosan.accounts
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.basicMarquee
@@ -40,6 +40,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -50,6 +52,7 @@ import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import com.rosan.accounts.data.common.utils.contentCopy
 import com.rosan.accounts.data.common.utils.toast
 import com.rosan.accounts.ui.theme.AccountsTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -78,7 +81,6 @@ class MainActivity : ComponentActivity() {
     private fun refresh() {
         refreshState.value = true
         getAccountTypes(refreshState, accountTypesState)
-        Toast.makeText(this,"",0).show()
     }
 
     @OptIn(
@@ -139,7 +141,9 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 if (accountTypes.isEmpty()) item {
                                     EmptyItemWidget()
-                                } else items(accountTypes) {
+                                } else items(accountTypes, key = {
+                                    it.type
+                                }) {
                                     ItemWidget(it)
                                 }
                             }
@@ -171,8 +175,13 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ItemWidget(accountType: AccountType) {
         ElevatedCard {
+            var showAccounts by remember {
+                mutableStateOf(false)
+            }
             Row(modifier = Modifier
-                .clickable { }
+                .clickable {
+                    showAccounts = !showAccounts
+                }
                 .padding(horizontal = 24.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Image(
@@ -192,6 +201,9 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     MyText(text = accountType.label, style = MaterialTheme.typography.titleMedium)
+                    AnimatedVisibility(visible = showAccounts && accountType.values.isNotEmpty()) {
+                        MyText("accounts: ${accountType.values.joinToString()}")
+                    }
                     MyText("package: ${accountType.packageName}")
                     MyText("type: ${accountType.type}")
                 }
@@ -205,16 +217,15 @@ class MainActivity : ComponentActivity() {
         jobOrNull?.cancel()
         jobOrNull = lifecycleScope.launch(Dispatchers.IO) {
             val result = kotlin.runCatching {
-                UserService(this@MainActivity).getAccountTypes()
+                UserService.getAccountTypes(this@MainActivity)
             }
             withContext(Dispatchers.Main) {
                 result.onSuccess {
                     accountTypesState.value = it
                 }.onFailure {
+                    if (it is CancellationException) return@onFailure
                     it.printStackTrace()
-                    Toast.makeText(
-                        this@MainActivity, "$it ${it.localizedMessage}", Toast.LENGTH_SHORT
-                    ).show()
+                    this@MainActivity.toast("$it ${it.localizedMessage}")
                 }
                 refreshState.value = false
             }

@@ -6,6 +6,7 @@ data class AccountType(
     val label: String,
     val icon: Drawable,
     val packageName: String,
-    val type: String
+    val type: String,
+    val values: List<String>
 )
 
