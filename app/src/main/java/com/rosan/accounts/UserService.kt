@@ -1,14 +1,13 @@
 package com.rosan.accounts
 
-import android.accounts.AccountManager
+import android.accounts.IAccountManager
 import android.content.Context
+import android.content.pm.IPackageManager
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.Parcel
 import android.os.ParcelFileDescriptor
-import android.os.Process
-import com.rosan.accounts.data.common.utils.id
-import com.rosan.accounts.data.common.utils.requireShizukuPermissionGranted
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import rikka.shizuku.ShizukuBinderWrapper
@@ -17,43 +16,44 @@ import java.io.FileDescriptor
 
 object UserService {
     suspend fun getAccountTypes(context: Context): Array<AccountType> {
-        val accounts = kotlin.runCatching {
-            requireShizukuPermissionGranted(context) {
-                getAccounts()
-                    // filter current user
-                    .filter { it.userId == Process.myUserHandle().id }
-            }
-        }.onFailure { it.printStackTrace() }.getOrNull()
-
+        val basePackageManager = context.packageManager
         val accountManager =
-            context.getSystemService(Context.ACCOUNT_SERVICE) as AccountManager
-        val packageManager = context.packageManager
+            IAccountManager.Stub.asInterface(shizukuBinder(Context.ACCOUNT_SERVICE))
+        val packageManager = IPackageManager.Stub.asInterface(shizukuBinder("package"))
+        val types = mutableListOf<AccountType>()
+        getAccounts().groupBy { it.userId }.forEach { (userId, accounts) ->
+            accountManager.getAuthenticatorTypes(userId).map {
+                val type = it.type
+                val values = accounts.filter { it.type == type }.map { it.name }
 
-        val types = accountManager.authenticatorTypes.map {
-            val type = it.type
+                val packageName = it.packageName
 
-            val values = accounts?.filter { it.type == type }?.map { it.name }
-                ?: emptyList()
-            if (accounts != null && values.isEmpty()) return@map null
+                val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                    packageManager.getPackageInfo(packageName, 0L, userId)
+                else packageManager.getPackageInfo(packageName, 0, userId)
+                val applicationInfo = packageInfo.applicationInfo
+                var label = basePackageManager.getApplicationLabel(applicationInfo).toString()
+                val accountName =
+                    basePackageManager.getText(packageName, it.labelId, applicationInfo)
 
-            val packageInfo = packageManager.getPackageInfo(it.packageName, 0)
-            val applicationInfo = packageInfo.applicationInfo
-            var label = applicationInfo.loadLabel(packageManager).toString()
-            val accountName = packageManager.getText(it.packageName, it.labelId, null)
-            if (accountName != null && label != accountName)
-                label += " - $accountName"
-            val icon = applicationInfo.loadIcon(packageManager)
+                if (accountName != null && label != accountName)
+                    label += " - $accountName"
 
-            return@map AccountType(
-                packageName = it.packageName,
-                type = type,
-                label = label,
-                icon = icon,
-                values = values
-            )
-        }.filterNotNull()
-
-        return types.sortedBy { it.label }.toTypedArray()
+                val icon = basePackageManager.getApplicationIcon(applicationInfo)
+                types.add(
+                    AccountType(
+                        userId = userId,
+                        packageName = it.packageName,
+                        type = type,
+                        label = label,
+                        icon = icon,
+                        values = values
+                    )
+                )
+            }
+        }
+        return types.filter { it.values.isNotEmpty() }
+            .toTypedArray()
     }
 
     private suspend fun getAccounts(): List<AccountInfo> {
@@ -121,11 +121,19 @@ object UserService {
         try {
             data.writeFileDescriptor(fd)
             data.writeStringArray(args)
-            ShizukuBinderWrapper(binder).transact(Binder.DUMP_TRANSACTION, data, reply, 0)
+            shizukuBinder(binder).transact(Binder.DUMP_TRANSACTION, data, reply, 0)
             reply.readException()
         } finally {
             data.recycle()
             reply.recycle()
         }
+    }
+
+    private fun shizukuBinder(name: String): IBinder {
+        return shizukuBinder(SystemServiceHelper.getSystemService(name))
+    }
+
+    private fun shizukuBinder(binder: IBinder): IBinder {
+        return ShizukuBinderWrapper(binder)
     }
 }

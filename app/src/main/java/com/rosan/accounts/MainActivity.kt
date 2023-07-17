@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import com.rosan.accounts.data.common.utils.contentCopy
+import com.rosan.accounts.data.common.utils.requireShizukuPermissionGranted
 import com.rosan.accounts.data.common.utils.toast
 import com.rosan.accounts.ui.theme.AccountsTheme
 import kotlinx.coroutines.CancellationException
@@ -134,7 +134,7 @@ class MainActivity : ComponentActivity() {
                             LazyVerticalStaggeredGrid(
                                 modifier = Modifier.fillMaxSize(),
                                 columns = if (accountTypes.isEmpty()) StaggeredGridCells.Fixed(1) else StaggeredGridCells.Adaptive(
-                                    300.dp
+                                    200.dp
                                 ),
                                 contentPadding = PaddingValues(16.dp),
                                 verticalItemSpacing = 16.dp,
@@ -142,7 +142,7 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 if (accountTypes.isEmpty()) item {
                                     EmptyItemWidget()
-                                } else items(accountTypes, key = {
+                                } else items(accountTypes.sortedBy { it.label }, key = {
                                     it.type
                                 }) {
                                     ItemWidget(it)
@@ -197,16 +197,15 @@ class MainActivity : ComponentActivity() {
                     fun MyText(
                         text: String, style: TextStyle = MaterialTheme.typography.bodyMedium
                     ) {
-                        Text(
-                            modifier = Modifier.basicMarquee(), text = text, style = style
-                        )
+                        Text(text, style = style)
                     }
-                    MyText(text = accountType.label, style = MaterialTheme.typography.titleMedium)
+                    MyText(accountType.label, style = MaterialTheme.typography.titleMedium)
+                    MyText("userId: ${accountType.userId}")
+                    MyText("package: ${accountType.packageName}")
+                    MyText("type: ${accountType.type}")
                     AnimatedVisibility(visible = showAccounts && accountType.values.isNotEmpty()) {
                         MyText("accounts: ${accountType.values.joinToString()}")
                     }
-                    MyText("package: ${accountType.packageName}")
-                    MyText("type: ${accountType.type}")
                 }
             }
         }
@@ -221,7 +220,9 @@ class MainActivity : ComponentActivity() {
                 // Wait for the system cache be refreshed
                 delay(1500)
 
-                UserService.getAccountTypes(this@MainActivity)
+                requireShizukuPermissionGranted(context) {
+                    UserService.getAccountTypes(this@MainActivity)
+                }
             }
             withContext(Dispatchers.Main) {
                 result.onSuccess {

@@ -103,6 +103,8 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
 
+    implementation project(':hidden-api')
+
     def accompanist_version = '0.30.1'
     implementation "com.google.accompanist:accompanist-drawablepainter:$accompanist_version"
 

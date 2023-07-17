@@ -1,0 +1,15 @@
+plugins {
+    id("com.android.library")
+}
+
+android {
+    namespace "com.rosan.hidden_api"
+    compileSdk 33
+
+    defaultConfig {
+        minSdk 19
+    }
+}
+
+dependencies {
+}
