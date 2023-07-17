@@ -6,6 +6,7 @@ import android.content.pm.IPackageManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.IUserManager
 import android.os.Parcel
 import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.Dispatchers
@@ -15,16 +16,23 @@ import rikka.shizuku.SystemServiceHelper
 import java.io.FileDescriptor
 
 object UserService {
-    suspend fun getAccountTypes(context: Context): Array<AccountType> {
+    suspend fun removeUser(userId: Int): Boolean {
+        return IUserManager.Stub.asInterface(shizukuBinder(Context.USER_SERVICE))
+            .removeUser(userId)
+    }
+
+    suspend fun getUsers(context: Context): Map<UserInfo, List<AccountType>> {
         val basePackageManager = context.packageManager
         val accountManager =
             IAccountManager.Stub.asInterface(shizukuBinder(Context.ACCOUNT_SERVICE))
         val packageManager = IPackageManager.Stub.asInterface(shizukuBinder("package"))
-        val types = mutableListOf<AccountType>()
-        getAccounts().groupBy { it.userId }.forEach { (userId, accounts) ->
-            accountManager.getAuthenticatorTypes(userId).map {
+        val users = mutableMapOf<UserInfo, List<AccountType>>()
+        getAccounts().forEach { (user, accounts) ->
+            val userId = user.id
+            val types = accountManager.getAuthenticatorTypes(userId).map {
                 val type = it.type
                 val values = accounts.filter { it.type == type }.map { it.name }
+                if (values.isEmpty()) return@map null
 
                 val packageName = it.packageName
 
@@ -40,42 +48,44 @@ object UserService {
                     label += " - $accountName"
 
                 val icon = basePackageManager.getApplicationIcon(applicationInfo)
-                types.add(
-                    AccountType(
-                        userId = userId,
-                        packageName = it.packageName,
-                        type = type,
-                        label = label,
-                        icon = icon,
-                        values = values
-                    )
+                AccountType(
+                    userId = userId,
+                    packageName = it.packageName,
+                    type = type,
+                    label = label,
+                    icon = icon,
+                    values = values
                 )
             }
+            users[user] = types.filterNotNull()
         }
-        return types.filter { it.values.isNotEmpty() }
-            .toTypedArray()
+        return users
     }
 
-    private suspend fun getAccounts(): List<AccountInfo> {
+    private suspend fun getAccounts(): Map<UserInfo, List<AccountInfo>> {
         val text = dumpsysAccount()
 
-        data class UserInfo(val id: Int, val numberOfAccounts: Int)
+        val result = mutableMapOf<UserInfo, List<AccountInfo>>()
 
-        val userIds = "User UserInfo\\{(\\d+):.*\\}".toRegex().findAll(text).toList().map {
-            it.groupValues[1].toInt()
-        }
-
-        val users = "Accounts: (\\d+)".toRegex().findAll(text).toList().let {
-            userIds.mapIndexed { index, userId ->
-                val numberOfAccounts = it[index].groupValues[1].toInt()
-                UserInfo(id = userId, numberOfAccounts = numberOfAccounts)
+        val users = "User UserInfo\\{(\\d+):(.*):.*\\}".toRegex().findAll(text).toList().map {
+            val userId = it.groupValues[1].toInt()
+            val name = it.groupValues[2]
+            UserInfo(id = userId, name = name, numberOfAccounts = 0).apply {
+                result[this] = listOf()
+            }
+        }.let { users ->
+            "Accounts: (\\d+)".toRegex().findAll(text).toList().let {
+                users.mapIndexed { index, user ->
+                    val numberOfAccounts = it[index].groupValues[1].toInt()
+                    user.copy(numberOfAccounts = numberOfAccounts)
+                }
             }
         }.toMutableList()
 
         fun readUser(): UserInfo {
             val user = users.first().let { user ->
                 if (user.numberOfAccounts > 0) return@let user
-                readUser()
+                return readUser()
             }.let {
                 it.copy(numberOfAccounts = it.numberOfAccounts - 1)
             }
@@ -83,7 +93,7 @@ object UserService {
             return user
         }
 
-        return "Account \\{name=(.*), type=(.*)\\}".toRegex().findAll(text).toList().map {
+        "Account \\{name=(.*), type=(.*)\\}".toRegex().findAll(text).toList().map {
             val name = it.groupValues[1]
             val type = it.groupValues[2]
             val userId = readUser().id
@@ -93,7 +103,11 @@ object UserService {
                 type = type,
                 name = name
             )
+        }.groupBy { it.userId }.map { (userId, accounts) ->
+            result[result.keys.first { userId == it.id }] = accounts
         }
+
+        return result
     }
 
     private suspend fun dumpsysAccount(): String = withContext(Dispatchers.IO) {
