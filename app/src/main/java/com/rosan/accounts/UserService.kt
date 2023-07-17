@@ -6,9 +6,10 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.Parcel
 import android.os.ParcelFileDescriptor
+import android.os.Process
+import com.rosan.accounts.data.common.utils.id
 import com.rosan.accounts.data.common.utils.requireShizukuPermissionGranted
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import rikka.shizuku.ShizukuBinderWrapper
 import rikka.shizuku.SystemServiceHelper
@@ -16,25 +17,25 @@ import java.io.FileDescriptor
 
 object UserService {
     suspend fun getAccountTypes(context: Context): Array<AccountType> {
-        // Wait for the system cache be refreshed
-        delay(1500)
-
-        val dumpsys = kotlin.runCatching {
+        val accounts = kotlin.runCatching {
             requireShizukuPermissionGranted(context) {
-                dumpsys()
+                getAccounts()
+                    // filter current user
+                    .filter { it.userId == Process.myUserHandle().id }
             }
-        }.onFailure { it.printStackTrace() }
-            .getOrNull()
+        }.onFailure { it.printStackTrace() }.getOrNull()
 
-        val accountTypes = mutableListOf<AccountType>()
         val accountManager =
             context.getSystemService(Context.ACCOUNT_SERVICE) as AccountManager
         val packageManager = context.packageManager
 
-        accountManager.authenticatorTypes.forEach {
+        val types = accountManager.authenticatorTypes.map {
             val type = it.type
 
-            if (dumpsys != null && !dumpsys.containsKey(type)) return@forEach
+            val values = accounts?.filter { it.type == type }?.map { it.name }
+                ?: emptyList()
+            if (accounts != null && values.isEmpty()) return@map null
+
             val packageInfo = packageManager.getPackageInfo(it.packageName, 0)
             val applicationInfo = packageInfo.applicationInfo
             var label = applicationInfo.loadLabel(packageManager).toString()
@@ -42,35 +43,57 @@ object UserService {
             if (accountName != null && label != accountName)
                 label += " - $accountName"
             val icon = applicationInfo.loadIcon(packageManager)
-            val values = dumpsys?.let { it[type] } ?: emptyList()
 
-            accountTypes.add(AccountType(label, icon, it.packageName, type, values))
-        }
+            return@map AccountType(
+                packageName = it.packageName,
+                type = type,
+                label = label,
+                icon = icon,
+                values = values
+            )
+        }.filterNotNull()
 
-        return accountTypes.sortedBy { it.label }.toTypedArray()
+        return types.sortedBy { it.label }.toTypedArray()
     }
 
-    private suspend fun dumpsys(): Map<String, List<String>>? {
+    private suspend fun getAccounts(): List<AccountInfo> {
         val text = dumpsysAccount()
-        val size = "Accounts: (\\d+)".toRegex().find(text).let {
-            if (it == null) return null
-            if (it.groupValues.size < 2) return null
-            it.groupValues[1].toIntOrNull() ?: return null
+
+        data class UserInfo(val id: Int, val numberOfAccounts: Int)
+
+        val userIds = "User UserInfo\\{(\\d+):.*\\}".toRegex().findAll(text).toList().map {
+            it.groupValues[1].toInt()
         }
 
-        var count = 0
-        val map = mutableMapOf<String, MutableList<String>>()
-        "Account \\{name=(.*), type=(.*)\\}".toRegex().findAll(text).forEach {
-            if (it.groupValues.size < 3) return null
+        val users = "Accounts: (\\d+)".toRegex().findAll(text).toList().let {
+            userIds.mapIndexed { index, userId ->
+                val numberOfAccounts = it[index].groupValues[1].toInt()
+                UserInfo(id = userId, numberOfAccounts = numberOfAccounts)
+            }
+        }.toMutableList()
+
+        fun readUser(): UserInfo {
+            val user = users.first().let { user ->
+                if (user.numberOfAccounts > 0) return@let user
+                readUser()
+            }.let {
+                it.copy(numberOfAccounts = it.numberOfAccounts - 1)
+            }
+            users[0] = user
+            return user
+        }
+
+        return "Account \\{name=(.*), type=(.*)\\}".toRegex().findAll(text).toList().map {
             val name = it.groupValues[1]
             val type = it.groupValues[2]
-            val values = map.getOrElse(type) { mutableListOf() }
-            values.add(name)
-            count += 1
-            map[type] = values
+            val userId = readUser().id
+
+            AccountInfo(
+                userId = userId,
+                type = type,
+                name = name
+            )
         }
-        return if (count < size) null
-        else map
     }
 
     private suspend fun dumpsysAccount(): String = withContext(Dispatchers.IO) {

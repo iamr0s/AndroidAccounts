@@ -55,6 +55,7 @@ import com.rosan.accounts.ui.theme.AccountsTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -217,6 +218,9 @@ class MainActivity : ComponentActivity() {
         jobOrNull?.cancel()
         jobOrNull = lifecycleScope.launch(Dispatchers.IO) {
             val result = kotlin.runCatching {
+                // Wait for the system cache be refreshed
+                delay(1500)
+
                 UserService.getAccountTypes(this@MainActivity)
             }
             withContext(Dispatchers.Main) {
