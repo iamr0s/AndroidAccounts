@@ -11,4 +11,5 @@
     <string name="account_manager">账号管理</string>
     <string name="account_empty">没有账户存在</string>
     <string name="copied_format_hail">复制成功，请在【雹】中导入！</string>
+    <string name="shizuku_not_working">请激活Shizuku并同意权限请求！</string>
 </resources>

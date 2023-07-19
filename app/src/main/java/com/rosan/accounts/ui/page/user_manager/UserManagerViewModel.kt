@@ -20,7 +20,7 @@ class UserManagerViewModel : ViewModel(), KoinComponent {
 
     private val userService by inject<UserService>()
 
-    var state by mutableStateOf(emptyList<UserEntity>())
+    var state by mutableStateOf(UserManagerViewState())
         private set
 
     fun dispatch(action: UserManagerViewAction) {
@@ -36,7 +36,14 @@ class UserManagerViewModel : ViewModel(), KoinComponent {
 
             viewModelScope.launch(Dispatchers.IO) {
                 while (true) {
-                    state = userService.getUsers().sortedBy { it.id }
+                    kotlin.runCatching {
+                        userService.getUsers().sortedBy { it.id }
+                    }.onFailure {
+                        it.printStackTrace()
+                        state = state.copy(cause = it)
+                    }.onSuccess {
+                        state = state.copy(users = it, cause = null)
+                    }
                     delay(1500)
                 }
             }

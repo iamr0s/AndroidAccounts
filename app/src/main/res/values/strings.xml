@@ -13,4 +13,5 @@
     <string name="account_manager">Account Manager</string>
     <string name="account_empty">No account exists</string>
     <string name="copied_format_hail">copied, import it in Hail!</string>
+    <string name="shizuku_not_working">Please activate Shizuku and agree to grant permission.</string>
 </resources>

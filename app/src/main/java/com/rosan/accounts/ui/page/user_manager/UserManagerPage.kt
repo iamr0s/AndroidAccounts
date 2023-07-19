@@ -1,6 +1,8 @@
 package com.rosan.accounts.ui.page.user_manager
 
 import android.os.Process
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -42,6 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.rosan.accounts.R
+import com.rosan.accounts.data.common.utils.help
 import com.rosan.accounts.data.common.utils.id
 import com.rosan.accounts.data.service.entity.UserEntity
 import com.rosan.accounts.ui.page.main.MainScreen
@@ -49,7 +52,7 @@ import org.koin.androidx.compose.getViewModel
 
 @OptIn(
     ExperimentalMaterial3Api::class,
-    ExperimentalFoundationApi::class
+    ExperimentalFoundationApi::class, ExperimentalAnimationApi::class
 )
 @Composable
 fun UserManagerPage(
@@ -72,18 +75,28 @@ fun UserManagerPage(
             )
         },
     ) {
-        Box(
+        AnimatedContent(
+            viewModel.state.cause != null,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(it)
         ) {
-            LazyColumn(
+            if (it) Box(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Text(
+                    viewModel.state.cause.let {
+                        it?.help() ?: it?.localizedMessage ?: it?.toString() ?: ""
+                    },
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            } else LazyColumn(
                 modifier = Modifier
                     .fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(viewModel.state, key = {
+                items(viewModel.state.users, key = {
                     it.id
                 }) {
                     var alpha by remember {
