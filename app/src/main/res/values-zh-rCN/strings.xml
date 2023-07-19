@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="user_manager">用户管理</string>
+    <string name="user_name_default">未命名</string>
+
+    <string name="delete_user_warning">确定要删除此用户吗？\n所有处于此用户空间的应用和数据都会消失！！！</string>
+    <string name="delete_user_confirm">是的，我确定！</string>
+
+    <string name="delete_user_cancel">取消</string>
+    <string name="remove">移除</string>
+    <string name="account_manager">账号管理</string>
+    <string name="account_empty">没有账户存在</string>
+    <string name="copied_format_hail">复制成功，请在【雹】中导入！</string>
+</resources>

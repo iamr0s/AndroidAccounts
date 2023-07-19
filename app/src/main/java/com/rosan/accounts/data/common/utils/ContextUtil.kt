@@ -16,7 +16,7 @@ fun runOnUiThread(action: () -> Unit) {
     }
 }
 
-fun Context.contentCopy(text: CharSequence) {
+fun Context.copy(text: CharSequence) {
     runOnUiThread {
         val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         manager.setPrimaryClip(ClipData.newPlainText("Label", text))

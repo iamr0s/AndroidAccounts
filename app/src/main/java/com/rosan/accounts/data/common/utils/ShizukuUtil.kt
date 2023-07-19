@@ -2,10 +2,13 @@ package com.rosan.accounts.data.common.utils
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.IBinder
+import android.os.ServiceManager
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
 import rikka.shizuku.Shizuku
+import rikka.shizuku.ShizukuBinderWrapper
 import rikka.sui.Sui
 
 suspend fun <T> requireShizukuPermissionGranted(context: Context, action: suspend () -> T): T {
@@ -30,3 +33,8 @@ suspend fun <T> requireShizukuPermissionGranted(context: Context, action: suspen
     }.first()
     return action()
 }
+
+fun shizukuBinder(name: String): IBinder =
+    shizukuBinder(ServiceManager.getService(name))
+
+fun shizukuBinder(binder: IBinder): IBinder = ShizukuBinderWrapper(binder)

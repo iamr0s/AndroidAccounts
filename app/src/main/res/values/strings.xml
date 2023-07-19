@@ -1,3 +1,16 @@
 <resources>
-    <string name="app_name">Accounts</string>
+    <string name="app_name" translatable="false">Accounts</string>
+
+    <string name="user_manager">User Manager</string>
+    <string name="user_name_default">Untitled</string>
+
+    <string name="delete_user_warning">Are you sure you want to delete this user space?\nAll applications and data in this user space will be lost!!!</string>
+    <string name="delete_user_confirm">Yes, I\'m sure!</string>
+    <string name="delete_user_cancel">No</string>
+
+    <string name="remove">Remove</string>
+
+    <string name="account_manager">Account Manager</string>
+    <string name="account_empty">No account exists</string>
+    <string name="copied_format_hail">copied, import it in Hail!</string>
 </resources>

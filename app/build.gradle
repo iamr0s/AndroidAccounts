@@ -17,8 +17,8 @@ android {
         applicationId "com.rosan.accounts"
         minSdk 21
         targetSdk 33
-        versionCode 5
-        versionName "1.4"
+        versionCode 6
+        versionName "1.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -74,7 +74,7 @@ android {
         compose true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion '1.3.2'
+        kotlinCompilerExtensionVersion '1.4.5'
     }
     packagingOptions {
         resources {
@@ -103,10 +103,22 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
 
-    implementation project(':hidden-api')
+    compileOnly project(':hidden-api')
+
+    implementation 'androidx.navigation:navigation-compose:2.6.0'
+
+    implementation 'org.lsposed.hiddenapibypass:hiddenapibypass:4.3'
 
     def accompanist_version = '0.30.1'
     implementation "com.google.accompanist:accompanist-drawablepainter:$accompanist_version"
+    implementation "com.google.accompanist:accompanist-navigation-animation:$accompanist_version"
+    implementation "com.google.accompanist:accompanist-insets:$accompanist_version"
+    implementation "com.google.accompanist:accompanist-insets-ui:$accompanist_version"
+    implementation "com.google.accompanist:accompanist-systemuicontroller:$accompanist_version"
+
+    implementation 'io.insert-koin:koin-core:3.4.2'
+    implementation 'io.insert-koin:koin-android:3.4.2'
+    implementation 'io.insert-koin:koin-androidx-compose:3.4.5'
 
     def shizuku_version = "13.1.4"
     implementation "dev.rikka.shizuku:api:$shizuku_version"
